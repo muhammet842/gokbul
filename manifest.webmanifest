@@ -1,0 +1,12 @@
+{
+  "name": "GökBul",
+  "short_name": "GökBul",
+  "description": "Gökyüzündeki parlak nokta ne? Telefonu tut, GökBul söylesin.",
+  "lang": "tr",
+  "start_url": "./#bak",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14110E",
+  "theme_color": "#14110E",
+  "icons": [{ "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
