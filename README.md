@@ -3,7 +3,16 @@
 Gökyüzündeki parlak nokta ne? Telefonu tut, GökBul söylesin.
 Okulda ve günlük hayatta kullanmak için, sadece çıplak gözle görülen gök cisimlerini anlatan Türkçe/İngilizce bir web uygulaması (PWA).
 
+**Uygulama:** https://muhammet842.github.io/gokbul/
 Tasarım taslağı (Figma): https://www.figma.com/design/0SRMOugamIOCJKef3KDSc9
+
+## Güncelleme yayınlama
+
+`main` dalına her `git push` yapıldığında GitHub Pages siteyi bir iki dakika içinde kendiliğinden günceller.
+Telefonlarda eski sürüm kalmasın diye `sw.js` içindeki `VERSION` değerini her seferinde artır (`gokbul-v1` → `gokbul-v2`).
+
+> Vercel'de de bir kopya var (gokbul.vercel.app), ama bazı mobil operatörler `vercel.app` adreslerini engellediği için
+> paylaşılacak adres GitHub Pages adresidir.
 
 ## Ekranlar
 
@@ -24,8 +33,7 @@ python -m http.server 8765
 
 Sonra tarayıcıda `http://localhost:8765` aç.
 
-> Telefonun pusulası ve konumu sadece **https** üzerinden çalışır. Telefonda denemek için projeyi
-> GitHub Pages veya Vercel'e yükle (ikisi de ücretsiz).
+> Telefonun pusulası ve konumu sadece **https** üzerinden çalışır; telefonda yayındaki adresi kullan.
 
 ## Dosyalar
 
