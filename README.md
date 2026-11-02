@@ -14,6 +14,13 @@ Telefonlarda eski sürüm kalmasın diye `sw.js` içindeki `VERSION` değerini h
 > Vercel'de de bir kopya var (gokbul.vercel.app), ama bazı mobil operatörler `vercel.app` adreslerini engellediği için
 > paylaşılacak adres GitHub Pages adresidir.
 
+## Zaman makinesi (şenlik ve ders sunumu için)
+
+Üst çubuktaki saat düğmesi bu akşam 18:00 ile sabah 06:00 arasında bir saat seçmeyi sağlar; bütün ekranlar o saatin gökyüzünü gösterir.
+Gündüz açılırsa doğrudan 21:00'e gider. Uygulamayı belli bir saatle açmak için adrese `?saat=21:00` ekle:
+
+https://muhammet842.github.io/gokbul/?saat=21:00
+
 ## Ekranlar
 
 | # | Ekran | Ne yapar |

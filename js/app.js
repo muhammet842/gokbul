@@ -34,8 +34,88 @@ async function ensureLocation() {
 function refreshSky(force) {
   const now = Date.now();
   if (!force && now - state.skyAt < 20e3) return;
-  state.sky = sky.visibleNow(new Date(), state.obs);
+  state.sky = sky.visibleNow(skyNow(), state.obs);
   state.skyAt = now;
+}
+
+// ---------- Zaman makinesi ----------
+// Gökyüzü hesaplarındaki "şimdi". offset 0 ise gerçek saat; değilse ileri/geri alınmış saat akmaya devam eder.
+const clock = { offset: 0, open: false };
+const skyNow = () => new Date(Date.now() + clock.offset);
+const RANGE_MIN = 12 * 60; // şerit: bu akşam 18:00 → sabah 06:00
+
+// Bu akşamın 18:00'i (sabah 06'dan önceysek dün akşamın 18:00'i)
+function eveningBase() {
+  const b = new Date();
+  if (b.getHours() < 6) b.setDate(b.getDate() - 1);
+  b.setHours(18, 0, 0, 0);
+  return b;
+}
+
+function setSkyTime(date) {
+  clock.offset = date ? date.getTime() - Date.now() : 0;
+  state.skyAt = 0;
+  lastCardKey = '';
+}
+
+function sliderValue() {
+  const m = Math.round((skyNow() - eveningBase()) / 60e3);
+  return Math.max(0, Math.min(RANGE_MIN, m));
+}
+
+function renderClock() {
+  const box = document.getElementById('zaman');
+  document.getElementById('clock').classList.toggle('on', clock.offset !== 0);
+  box.hidden = !clock.open;
+  if (!clock.open) return;
+  const now = skyNow();
+  box.innerHTML = `
+    <div class="zaman-row"><span class="t-etiket kirmizi">${upper(t('tm.title'))}</span><button class="t-etiket" id="tmNow" type="button">${upper(t('tm.now'))}</button></div>
+    <div class="zaman-row"><span class="t-orta" id="tmTime">${hhmm(now)}</span><span class="t-veri" id="tmDay">${t(now.getHours() >= 12 ? 'tm.evening' : 'tm.late')}</span></div>
+    <input type="range" id="tmRange" min="0" max="${RANGE_MIN}" step="15" value="${sliderValue()}" aria-label="${t('tm.title')}">
+    <div class="zaman-olcek"><span>18:00</span><span>21:00</span><span>00:00</span><span>03:00</span><span>06:00</span></div>`;
+  document.getElementById('tmNow').onclick = () => { setSkyTime(null); clock.open = false; renderClock(); rerender(); };
+  document.getElementById('tmRange').oninput = e => {
+    setSkyTime(new Date(eveningBase().getTime() + e.target.value * 60e3));
+    const d = skyNow();
+    document.getElementById('tmTime').textContent = hhmm(d);
+    document.getElementById('tmDay').textContent = t(d.getHours() >= 12 ? 'tm.evening' : 'tm.late');
+    document.getElementById('clock').classList.add('on');
+    rerender();
+  };
+}
+
+function toggleClock() {
+  clock.open = !clock.open;
+  // Gündüz açılırsa doğrudan bu akşam 21:00'e git: zaten bunun için açıldı
+  if (clock.open && clock.offset === 0) {
+    const h = new Date().getHours();
+    if (h >= 6 && h < 18) { const d = eveningBase(); d.setHours(21); setSkyTime(d); rerender(); }
+  }
+  renderClock();
+}
+
+// Saat değişince açık ekranı yeniden çiz (kaydırırken çok sık olmasın). Bak ekranı zaten her karede çizilir.
+let rerenderTimer = 0;
+function rerender() {
+  clearTimeout(rerenderTimer);
+  rerenderTimer = setTimeout(() => {
+    const [name, arg] = (location.hash.replace('#', '') || 'bak').split('/');
+    if (name === 'gece') viewGece();
+    else if (name === 'cisim') viewCisim(arg);
+  }, 120);
+}
+
+// ?saat=21:00 ile açılırsa o saatin gökyüzü (şenlik ve ders sunumu için)
+function clockFromUrl() {
+  const q = new URLSearchParams(location.search);
+  const m = /^(\d{1,2})(?::(\d{2}))?$/.exec(q.get('saat') ?? q.get('time') ?? '');
+  if (!m || +m[1] > 23) return;
+  const d = eveningBase();
+  if (+m[1] < 12) d.setDate(d.getDate() + 1);
+  d.setHours(+m[1], +(m[2] ?? 0), 0, 0);
+  setSkyTime(d);
+  clock.open = true;
 }
 
 // ---------- Tema (varsayılan gece, elle değiştirilir ve hatırlanır) ----------
@@ -178,7 +258,7 @@ async function viewGece() {
   $view.innerHTML = `<div class="gece-head"><span class="t-etiket">${t('gece.locating')}</span></div>`;
   await ensureLocation();
   refreshSky(true);
-  const now = new Date();
+  const now = skyNow();
   const { win, items } = sky.tonight(now, state.obs);
   const date = upper(now.toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' }));
   const sunLine = win ? (now > win.sunset ? t('gece.sunsetPast', { t: hhmm(win.sunset) }) : t('gece.sunset', { t: hhmm(win.sunset) })) : '';
@@ -198,7 +278,7 @@ function kayit(i) {
   const note = i.obj.body ? (i.sets ? t('gece.sets', { t: hhmm(i.sets) }) : cap(L(i.obj.alias))) : L(i.obj.note);
   return `
     <li><a class="kayit" href="#cisim/${i.obj.id}">
-      <span class="saat${i.isNow ? ' simdi' : ''}">${i.isNow ? t('gece.now') : hhmm(i.time)}</span>
+      <span class="saat${i.isNow ? ' simdi' : ''}">${i.isNow && !clock.offset ? t('gece.now') : hhmm(i.time)}</span>
       <span>
         <span class="ad">${esc(L(i.obj.name))}</span><br>
         <span class="yon">${whereText(i.az, i.alt)}</span><br>
@@ -250,7 +330,7 @@ async function answer(node, [label, next]) {
   if (typeof next === 'number') {                      // yön seçildi → gökyüzüne bak
     await ensureLocation();
     const kind = qz.step.split(':')[1];
-    const now = new Date();
+    const now = skyNow();
     const hit = sky.brightestToward(next, kind, now, state.obs) ?? sky.brightestToward(next, kind === 'planet' ? 'star' : 'planet', now, state.obs);
     qz.result = hit ? { id: hit.obj.id } : { none: true };
   } else if (next.startsWith('=')) {
@@ -282,10 +362,10 @@ async function viewCisim(id) {
   const o = byId(id);
   if (!o) { location.hash = 'bak'; return; }
   await ensureLocation();
-  const now = new Date();
+  const now = skyNow();
   const p = sky.position(o, now, state.obs);
   const night = sky.tonight(now, state.obs, 99).items.find(i => i.obj === o);
-  const tonightText = night ? `${night.isNow ? t('gece.now') : hhmm(night.time)}${night.sets ? ' – ' + hhmm(night.sets) : ''}` : t('cisim.notUp');
+  const tonightText = night ? `${night.isNow && !clock.offset ? t('gece.now') : hhmm(night.time)}${night.sets ? ' – ' + hhmm(night.sets) : ''}` : t('cisim.notUp');
   const where = p.alt > 0 ? whereText(p.az, p.alt) : night ? whereText(night.az, night.alt) : '—';
   const dist = p.distKm == null ? null
     : p.distKm < 1e6 ? `${Math.round(p.distKm).toLocaleString(locale())} km`
@@ -339,17 +419,20 @@ function route() {
   document.querySelectorAll('.tabbar a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab));
   cancelAnimationFrame(raf);
   window.scrollTo(0, 0);
+  renderClock();
   if (name === 'gece') viewGece();
   else if (name === 'sor') viewSor();
   else if (name === 'cisim') viewCisim(arg);
   else viewBak();
 }
 
+document.getElementById('clock').onclick = toggleClock;
 document.getElementById('theme').onclick = () => applyTheme(document.documentElement.dataset.theme === 'gunduz' ? 'gece' : 'gunduz');
 document.getElementById('lang').onclick = () => { setLang(getLang() === 'tr' ? 'en' : 'tr'); route(); };
 window.addEventListener('hashchange', route);
 setLang(getLang());
 applyTheme(savedTheme() === 'gunduz' ? 'gunduz' : 'gece');
+clockFromUrl();
 ensureLocation().then(() => refreshSky(true));
 route();
 

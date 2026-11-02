@@ -69,7 +69,19 @@ main { flex: 1; display: flex; flex-direction: column; padding-bottom: 92px; }
 .top-actions { display: flex; align-items: center; gap: 18px; }
 .theme { display: flex; padding: 8px 0; color: var(--murekkep-2); }
 .theme svg { width: 15px; height: 15px; transition: transform .3s; }
-:root[data-theme="gunduz"] .theme svg { transform: rotate(180deg); }
+:root[data-theme="gunduz"] #theme svg { transform: rotate(180deg); }
+.clock-btn.on { color: var(--kirmizi); }
+
+/* ---------- Zaman makinesi ---------- */
+.zaman { padding: 4px var(--gutter) 16px; border-bottom: 1px solid var(--cizgi); display: flex; flex-direction: column; gap: 10px; }
+.zaman[hidden] { display: none; }
+.zaman-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.zaman input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; margin: 0; }
+.zaman input[type=range]::-webkit-slider-runnable-track { height: 1px; background: var(--murekkep-3); }
+.zaman input[type=range]::-moz-range-track { height: 1px; background: var(--murekkep-3); }
+.zaman input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -8px; border-radius: 50%; background: var(--kirmizi); border: 0; }
+.zaman input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--kirmizi); border: 0; }
+.zaman-olcek { display: flex; justify-content: space-between; font: 400 10px var(--mono); color: var(--murekkep-3); }
 .lang { display: flex; gap: 6px; font: 500 11px var(--mono); letter-spacing: 0.08em; color: var(--murekkep-3); padding: 8px 0; }
 .lang [data-lang].on { color: var(--murekkep); }
 
@@ -88,6 +100,7 @@ main { flex: 1; display: flex; flex-direction: column; padding-bottom: 92px; }
 .tabbar a.on i { opacity: 1; }
 
 /* ---------- 01 Bak ---------- */
+.ruler, .vizor { -webkit-user-select: none; user-select: none; }
 .ruler { position: relative; height: 58px; overflow: hidden; }
 .ruler-track { position: absolute; inset: 0; }
 .ruler .tick { position: absolute; top: 22px; width: 1px; height: 6px; background: var(--murekkep-3); }
