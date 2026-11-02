@@ -23,7 +23,10 @@ const dirShort = az => (getLang() === 'tr' ? DIRS : DIRS_EN)[Math.round(az / 45)
 const fists = alt => Math.max(0, Math.round(alt / 10));
 const whereText = (az, alt) => `${dirName(az)}, ${alt > 75 ? t('gece.overhead') : (fists(alt) <= 1 ? t('gece.above1') : t('gece.above', { n: fists(alt) }))}`;
 const cap = s => s.charAt(0).toLocaleUpperCase(locale()) + s.slice(1);
-const fmtMag = m => (m < 0 ? '−' : '') + Math.abs(m).toFixed(1);
+const fmtNum = (n, d = 1) => n.toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtMag = m => (m < 0 ? '−' : '') + fmtNum(Math.abs(m));
+// Konum uyumu: baktığın yön ile cisim arasındaki açıya göre (0° → %100, 10° → %37)
+const matchPct = sep => Math.round(100 * Math.exp(-((sep / 10) ** 2)));
 
 async function ensureLocation() {
   if (state.loc) return;
@@ -230,7 +233,7 @@ function drawVizor(az, alt) {
 function drawCard(az, alt) {
   const hits = sky.identify(az, alt, state.sky);
   const [best, second] = hits;
-  const key = (best?.obj.id ?? '-') + (second?.obj.id ?? '-') + getLang() + (best && best.sep < 8);
+  const key = [best?.obj.id, second?.obj.id, getLang(), best && Math.round(best.sep * 2)].join('|');
   if (key === lastCardKey) return;
   lastCardKey = key;
   const card = document.getElementById('card');
@@ -242,13 +245,13 @@ function drawCard(az, alt) {
   const steady = o.body ? (getLang() === 'tr' ? 'titreşmez' : 'steady') : (getLang() === 'tr' ? 'titreşir' : 'twinkles');
   card.innerHTML = `
     <div class="cevap">
-      <div class="row"><span class="t-etiket kirmizi">${upper(best.sep < 8 ? t('bak.likely') : t('bak.maybe'))}</span><span class="t-etiket">${fmtMag(best.mag)} ${t('cisim.magUnit')}</span></div>
+      <div class="row"><span class="t-etiket kirmizi">${upper(t('bak.match', { p: matchPct(best.sep) }))}</span><span class="t-etiket">${upper(t('bak.offset', { d: fmtNum(best.sep) }))}</span></div>
       <h1 class="t-dev">${esc(L(o.name))}</h1>
-      <p class="t-veri">${L(TYPE_LABEL[o.type])} · ${steady}</p>
+      <p class="t-veri">${L(TYPE_LABEL[o.type])} · ${fmtMag(best.mag)} ${t('cisim.magUnit')} · ${steady}</p>
       <p class="t-not">${esc(L(o.note))}</p>
       <div class="row" style="padding-top:6px">
         <a class="link" href="#cisim/${o.id}">${t('bak.why')}</a>
-        ${second ? `<span class="t-veri soluk" style="font-size:10px">${t('bak.other')}: ${esc(L(second.obj.name))}</span>` : ''}
+        ${second ? `<span class="t-veri soluk" style="font-size:10px">${t('bak.other')}: ${esc(L(second.obj.name))} · ${fmtNum(second.sep, 0)}°</span>` : ''}
       </div>
     </div>`;
 }
@@ -347,7 +350,7 @@ function sorResult() {
   const [name, note] = r.none ? ['sor.none', 'sor.noneNote'] : r.kind === 'plane' ? ['sor.plane', 'sor.planeNote'] : ['sor.sat', 'sor.satNote'];
   $view.innerHTML = `
     <div class="cevap">
-      <span class="t-etiket kirmizi">${upper(r.none ? t('bak.nothing') : t('bak.likely'))}</span>
+      <span class="t-etiket kirmizi">${upper(t(r.none ? 'sor.noMatch' : 'sor.result'))}</span>
       <h1 class="t-buyuk">${t(name)}</h1>
       <p class="t-not">${t(note)}</p>
     </div>

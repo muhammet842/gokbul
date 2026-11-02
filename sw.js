@@ -1,5 +1,5 @@
 // Çevrimdışı çalışma: uygulama dosyalarını önbelleğe al. Dosya eklersen SHELL'e ve sürüme dokun.
-const VERSION = 'gokbul-v2';
+const VERSION = 'gokbul-v3';
 const SHELL = [
   './', 'index.html', 'css/style.css', 'manifest.webmanifest', 'icons/icon.svg',
   'js/app.js', 'js/i18n.js', 'js/objects.js', 'js/sky.js', 'js/sensors.js',
