@@ -63,7 +63,7 @@ const skyList = () => (state.sats.length ? [...state.sky, ...state.sats] : state
 
 // ---------- Zaman makinesi ----------
 // Gökyüzü hesaplarındaki "şimdi". offset 0 ise gerçek saat; değilse ileri/geri alınmış saat akmaya devam eder.
-const clock = { offset: 0 }; // zaman makinesi ekranın altında hep açık
+const clock = { offset: 0 }; // zaman makinesi sadece Bak ekranında, altta hep açık
 const skyNow = () => new Date(Date.now() + clock.offset);
 const RANGE_MIN = 12 * 60; // şerit: bu akşam 18:00 → sabah 06:00
 
@@ -585,6 +585,11 @@ function route() {
   document.querySelectorAll('.tabbar a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab));
   cancelAnimationFrame(raf);
   window.scrollTo(0, 0);
+  // Zaman makinesi sadece Bak ekranında. Diğer ekranlar her zaman gerçek saati gösterir
+  // (yoksa "Bu gece" listesi ileri alınmış saati "ŞİMDİ" diye gösterirdi).
+  const onLook = !['gece', 'sor', 'cisim'].includes(name);
+  document.documentElement.classList.toggle('zaman-acik', onLook);
+  if (!onLook && clock.offset) setSkyTime(null);
   renderClock();
   if (name === 'gece') viewGece();
   else if (name === 'sor') viewSor();

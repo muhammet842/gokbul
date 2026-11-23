@@ -45,7 +45,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   display: flex;
   flex-direction: column;
 }
-main { flex: 1; display: flex; flex-direction: column; padding-bottom: 240px; } /* alttaki zaman makinesi + menü kadar */
+main { flex: 1; display: flex; flex-direction: column; padding-bottom: 92px; } /* alttaki menü kadar */
+/* Zaman makinesi sadece Bak ekranında: o ekranda içerik onun arkasında kalmasın */
+:root.zaman-acik main { padding-bottom: 240px; }
+:root:not(.zaman-acik) .zaman { display: none; }
 
 /* ---------- Tipografi ---------- */
 /* Uzun adlar ("Uluslararası Uzay İstasyonu") dar ekranda taşmasın: boyut ekran genişliğine göre */
