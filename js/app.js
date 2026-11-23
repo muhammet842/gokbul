@@ -28,8 +28,6 @@ const whereText = (az, alt) => `${dirName(az)}, ${alt > OVERHEAD ? t('gece.overh
 const cap = s => s.charAt(0).toLocaleUpperCase(locale()) + s.slice(1);
 const fmtNum = (n, d = 1) => n.toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
 const fmtMag = m => (m < 0 ? '−' : '') + fmtNum(Math.abs(m));
-// Konum uyumu: baktığın yön ile cisim arasındaki açıya göre (0° → %100, 10° → %37)
-const matchPct = sep => Math.round(100 * Math.exp(-((sep / 10) ** 2)));
 
 async function ensureLocation() {
   if (state.loc) return;
@@ -79,6 +77,7 @@ function renderClock() {
   const box = document.getElementById('zaman');
   document.getElementById('clock').classList.toggle('on', clock.offset !== 0);
   box.hidden = !clock.open;
+  document.documentElement.classList.toggle('zaman-acik', clock.open);
   if (!clock.open) return;
   const now = skyNow();
   box.innerHTML = `
@@ -311,15 +310,11 @@ function drawCard(hits) {
   if (key === lastCardKey) return;
   lastCardKey = key;
   const card = document.getElementById('card');
-  if (!best) {
-    card.innerHTML = `<div class="cevap"><span class="t-etiket">${upper(t('bak.nothing'))}</span><p class="t-not">${t(state.sensor === 'drag' ? 'bak.nosensor' : 'bak.nothingHint')}</p></div>`;
-    return;
-  }
+  if (!best) { card.innerHTML = ''; return; } // halkada cisim yoksa kart boş kalır
   const o = best.obj;
   const steady = t(o.body ? 'bak.steady' : 'bak.twinkles');
   card.innerHTML = `
     <div class="cevap">
-      <div class="row"><span class="t-etiket kirmizi">${upper(t('bak.match', { p: matchPct(best.sep) }))}</span><span class="t-etiket">${upper(t('bak.offset', { d: fmtNum(best.sep) }))}</span></div>
       <h1 class="t-dev">${esc(L(o.name))}</h1>
       <p class="t-veri">${L(TYPE_LABEL[o.type])} · ${fmtMag(best.mag)} ${t('cisim.magUnit')} · ${steady}</p>
       <p class="t-not">${esc(L(o.note))}</p>

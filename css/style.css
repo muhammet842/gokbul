@@ -73,7 +73,9 @@ main { flex: 1; display: flex; flex-direction: column; padding-bottom: 92px; }
 .clock-btn.on { color: var(--kirmizi); }
 
 /* ---------- Zaman makinesi ---------- */
-.zaman { padding: 4px var(--gutter) 16px; border-bottom: 1px solid var(--cizgi); display: flex; flex-direction: column; gap: 10px; }
+.zaman { padding: 14px var(--gutter) 12px; border-top: 1px solid var(--cizgi); display: flex; flex-direction: column; gap: 10px; }
+/* Zaman makinesi açıkken içerik onun arkasında kalmasın */
+:root.zaman-acik main { padding-bottom: 240px; }
 .zaman[hidden] { display: none; }
 .zaman-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .zaman input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; margin: 0; }
@@ -86,11 +88,14 @@ main { flex: 1; display: flex; flex-direction: column; padding-bottom: 92px; }
 .lang [data-lang].on { color: var(--murekkep); }
 
 /* ---------- Alt menü ---------- */
-.tabbar {
+/* Alt panel: zaman makinesi (açıksa) + menü, ekranın altına sabit */
+.alt {
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-  width: 100%; max-width: var(--max);
+  width: 100%; max-width: var(--max); background: var(--zemin); z-index: 10;
+}
+.tabbar {
   display: flex; padding: 14px var(--gutter) calc(10px + env(safe-area-inset-bottom));
-  background: var(--zemin); border-top: 1px solid var(--cizgi);
+  border-top: 1px solid var(--cizgi);
 }
 .tabbar a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--murekkep-2); font-size: 14px; }
 .tabbar small { font: 500 9px var(--mono); letter-spacing: 0.08em; color: var(--murekkep-3); }

@@ -4,9 +4,6 @@ export const STRINGS = {
   tr: {
     'tab.bak': 'Bak', 'tab.gece': 'Bu gece', 'tab.sor': 'Sor',
     'bak.start': 'Telefonu gökyüzüne tut', 'bak.startHint': 'Pusula ve konum izni istenecek',
-    'bak.nosensor': 'Bu cihazda pusula yok. Ekranı parmağınla kaydırarak etrafa bakabilirsin.',
-    'bak.match': 'Konum uyumu %{p}', 'bak.offset': 'Sapma {d}°', 'bak.nothing': 'Görüş alanında belirgin cisim yok',
-    'bak.nothingHint': 'Telefonu yavaşça parlak bir noktaya doğru çevir.',
     'bak.why': 'Ayrıntılı bilgi →', 'bak.ring': 'Halkada {n} cisim var · hangisine bakıyorsun?',
     'bak.horizon': 'Ufuk', 'bak.altitude': 'Yükseklik', 'bak.below': 'Ufkun altında',
     'bak.steady': 'titreşmez', 'bak.twinkles': 'titreşir',
@@ -50,9 +47,6 @@ export const STRINGS = {
   en: {
     'tab.bak': 'Look', 'tab.gece': 'Tonight', 'tab.sor': 'Ask',
     'bak.start': 'Hold your phone up to the sky', 'bak.startHint': 'We’ll ask for compass and location access',
-    'bak.nosensor': 'No compass on this device. Drag the screen with your finger to look around.',
-    'bak.match': 'Position match {p}%', 'bak.offset': 'Offset {d}°', 'bak.nothing': 'No notable object in view',
-    'bak.nothingHint': 'Slowly turn the phone towards a bright dot.',
     'bak.why': 'Full details →', 'bak.ring': '{n} objects in the ring · which one are you looking at?',
     'bak.horizon': 'Horizon', 'bak.altitude': 'Altitude', 'bak.below': 'Below the horizon',
     'bak.steady': 'steady', 'bak.twinkles': 'twinkles',
