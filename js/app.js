@@ -63,7 +63,7 @@ const skyList = () => (state.sats.length ? [...state.sky, ...state.sats] : state
 
 // ---------- Zaman makinesi ----------
 // Gökyüzü hesaplarındaki "şimdi". offset 0 ise gerçek saat; değilse ileri/geri alınmış saat akmaya devam eder.
-const clock = { offset: 0, open: false };
+const clock = { offset: 0 }; // zaman makinesi ekranın altında hep açık
 const skyNow = () => new Date(Date.now() + clock.offset);
 const RANGE_MIN = 12 * 60; // şerit: bu akşam 18:00 → sabah 06:00
 
@@ -86,37 +86,26 @@ function sliderValue() {
   return Math.max(0, Math.min(RANGE_MIN, m));
 }
 
+// Saatin yanındaki açıklama: gerçek saatteyse "Şimdi", değilse akşam / gece yarısından sonra
+const dayLabel = d => t(!clock.offset ? 'gece.now' : d.getHours() >= 12 ? 'tm.evening' : 'tm.late');
+
 function renderClock() {
   const box = document.getElementById('zaman');
-  document.getElementById('clock').classList.toggle('on', clock.offset !== 0);
-  box.hidden = !clock.open;
-  document.documentElement.classList.toggle('zaman-acik', clock.open);
-  if (!clock.open) return;
   const now = skyNow();
   box.innerHTML = `
-    <div class="zaman-row"><span class="t-etiket kirmizi">${upper(t('tm.title'))}</span><button class="t-etiket" id="tmNow" type="button">${upper(t('tm.now'))}</button></div>
-    <div class="zaman-row"><span class="t-orta" id="tmTime">${hhmm(now)}</span><span class="t-veri" id="tmDay">${t(now.getHours() >= 12 ? 'tm.evening' : 'tm.late')}</span></div>
+    <div class="zaman-row"><span class="t-etiket kirmizi">${upper(t('tm.title'))}</span><button class="t-etiket" id="tmNow" type="button"${clock.offset ? '' : ' hidden'}>${upper(t('tm.now'))}</button></div>
+    <div class="zaman-row"><span class="t-orta" id="tmTime">${hhmm(now)}</span><span class="t-veri" id="tmDay">${dayLabel(now)}</span></div>
     <input type="range" id="tmRange" min="0" max="${RANGE_MIN}" step="15" value="${sliderValue()}" aria-label="${t('tm.title')}">
     <div class="zaman-olcek"><span>18:00</span><span>21:00</span><span>00:00</span><span>03:00</span><span>06:00</span></div>`;
-  document.getElementById('tmNow').onclick = () => { setSkyTime(null); clock.open = false; renderClock(); rerender(); };
+  document.getElementById('tmNow').onclick = () => { setSkyTime(null); renderClock(); rerender(); };
   document.getElementById('tmRange').oninput = e => {
     setSkyTime(new Date(eveningBase().getTime() + e.target.value * 60e3));
     const d = skyNow();
     document.getElementById('tmTime').textContent = hhmm(d);
-    document.getElementById('tmDay').textContent = t(d.getHours() >= 12 ? 'tm.evening' : 'tm.late');
-    document.getElementById('clock').classList.add('on');
+    document.getElementById('tmDay').textContent = dayLabel(d);
+    document.getElementById('tmNow').hidden = false;
     rerender();
   };
-}
-
-function toggleClock() {
-  clock.open = !clock.open;
-  // Gündüz açılırsa doğrudan bu akşam 21:00'e git: zaten bunun için açıldı
-  if (clock.open && clock.offset === 0) {
-    const h = new Date().getHours();
-    if (h >= 6 && h < 18) { const d = eveningBase(); d.setHours(21); setSkyTime(d); rerender(); }
-  }
-  renderClock();
 }
 
 // Saat değişince açık ekranı yeniden çiz (kaydırırken çok sık olmasın). Bak ekranı zaten her karede çizilir.
@@ -139,7 +128,6 @@ function clockFromUrl() {
   if (+m[1] < 12) d.setDate(d.getDate() + 1);
   d.setHours(+m[1], +(m[2] ?? 0), 0, 0);
   setSkyTime(d);
-  clock.open = true;
 }
 
 // ---------- Tema (varsayılan gece, elle değiştirilir ve hatırlanır) ----------
@@ -583,7 +571,7 @@ function glyph(o, date) {
       <path d="M${c} ${c - r}A${r} ${r} 0 0 ${s1} ${c} ${c + r}A${rx} ${r} 0 0 ${s2} ${c} ${c - r}Z" fill="var(--murekkep-2)"/></svg>`;
   }
   if (o.body) return `<svg class="evre" viewBox="0 0 72 72" aria-hidden="true"><circle cx="${c}" cy="${c}" r="${r - 6}" fill="var(--murekkep-2)"/><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--murekkep-3)"/></svg>`;
-  if (o.sat) return `<svg class="evre" viewBox="0 0 72 72" aria-hidden="true"><path d="M20 36h32" stroke="var(--murekkep-3)"/><rect x="31" y="31" width="10" height="10" fill="var(--murekkep-2)"/><rect x="6" y="26" width="14" height="20" fill="none" stroke="var(--murekkep-2)"/><rect x="52" y="26" width="14" height="20" fill="none" stroke="var(--murekkep-2)"/><path d="M13 26v20M59 26v20" stroke="var(--murekkep-3)"/></svg>`;
+  if (o.sat) return '';
   if (o.type === 'galaksi' || o.type === 'bulutsu') return `<svg class="evre" viewBox="0 0 72 72" aria-hidden="true"><ellipse cx="${c}" cy="${c}" rx="${o.type === 'galaksi' ? 30 : 22}" ry="${o.type === 'galaksi' ? 10 : 16}" transform="rotate(-30 ${c} ${c})" fill="none" stroke="var(--murekkep-3)"/><ellipse cx="${c}" cy="${c}" rx="${o.type === 'galaksi' ? 12 : 9}" ry="${o.type === 'galaksi' ? 4 : 7}" transform="rotate(-30 ${c} ${c})" fill="var(--murekkep-2)"/></svg>`;
   return `<svg class="evre" viewBox="0 0 72 72" aria-hidden="true" stroke="var(--murekkep-2)"><path d="M36 14v44M14 36h44M22 22l28 28M50 22L22 50" stroke-width="1"/><circle cx="36" cy="36" r="4" fill="var(--murekkep)" stroke="none"/></svg>`;
 }
@@ -604,7 +592,6 @@ function route() {
   else viewBak();
 }
 
-document.getElementById('clock').onclick = toggleClock;
 document.getElementById('theme').onclick = () => applyTheme(document.documentElement.dataset.theme === 'gunduz' ? 'gece' : 'gunduz');
 document.getElementById('lang').onclick = () => { setLang(getLang() === 'tr' ? 'en' : 'tr'); route(); };
 window.addEventListener('hashchange', route);
