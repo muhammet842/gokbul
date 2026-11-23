@@ -128,20 +128,30 @@ main { flex: 1; display: flex; flex-direction: column; padding-bottom: 92px; }
 
 /* ---------- 02 Bu gece ---------- */
 .gece-head { padding: 12px var(--gutter) 8px; display: flex; flex-direction: column; gap: 6px; }
-/* Konum seçici: metne dokununca telefonun kendi seçim listesi açılır */
-.yer { position: relative; display: inline-block; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.yer select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+/* Konum satırı: tamamına dokununca telefonun kendi seçim listesi açılır */
+.konum { position: relative; margin: 8px var(--gutter) 0; padding: 14px 0; border-top: 1px solid var(--cizgi); border-bottom: 1px solid var(--cizgi);
+  display: flex; justify-content: space-between; align-items: center; gap: 16px; cursor: pointer; }
+.konum-metin { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.konum-ad { font: 400 21px/1.2 var(--serif); }
+.konum select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+/* Gün batımı · gün doğumu · Ay: üç eşit kutu */
+.ozet { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0 var(--gutter); border-bottom: 1px solid var(--cizgi); }
+.ozet div { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; }
+.ozet div + div { padding-left: 14px; border-left: 1px solid var(--cizgi); }
+.ozet div span:last-child { font: 400 15px var(--mono); color: var(--murekkep); }
 .kayitlar { padding: 0 var(--gutter); list-style: none; }
-.kayit { display: grid; grid-template-columns: 48px 1fr 44px; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--cizgi); }
-.kayit .saat { font: 400 13px var(--mono); padding-top: 4px; }
-.kayit .saat.simdi { color: var(--kirmizi); }
+.kayit { display: grid; grid-template-columns: 56px 1fr 56px; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--cizgi); }
+.kayit .saat { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; }
+.kayit .saat b { font: 400 13px var(--mono); color: var(--murekkep); }
+.kayit .saat small { font: 500 9px var(--mono); letter-spacing: 0.08em; color: var(--murekkep-3); }
+.kayit .saat small.kirmizi { color: var(--kirmizi); }
 .kayit .ad { font: 400 21px/1.2 var(--serif); }
 .kayit .yon { font-size: 13px; color: var(--murekkep-2); }
 .kayit .not { font: italic 300 14px/1.45 var(--serif); color: var(--murekkep-3); }
 .ufuk { position: relative; height: 64px; }
 .ufuk::before { content: ""; position: absolute; left: 0; right: 0; top: 48px; height: 1px; background: var(--murekkep-2); }
-.ufuk .cetvel { position: absolute; left: 0; top: 8px; width: 4px; height: 40px;
-  background: repeating-linear-gradient(to bottom, var(--murekkep-3) 0 1px, transparent 1px 10px); }
+.ufuk .cetvel { position: absolute; left: 0; top: 3px; width: 4px; height: 45px;
+  background: repeating-linear-gradient(to bottom, var(--murekkep-3) 0 1px, transparent 1px 5px); }
 .ufuk .nokta { position: absolute; left: 19px; width: 6px; height: 6px; border-radius: 50%; background: var(--kirmizi); }
 .ufuk .ymr { position: absolute; right: 0; top: 52px; font: 500 8px var(--mono); letter-spacing: 0.08em; color: var(--murekkep-3); }
 .ipucu { display: flex; gap: 10px; padding: 14px var(--gutter) 0; font-size: 12px; color: var(--murekkep-3); }

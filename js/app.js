@@ -21,8 +21,10 @@ const DIRS = ['K', 'KD', 'D', 'GD', 'G', 'GB', 'B', 'KB'];
 const dirName = az => t('dir.' + DIRS[Math.round(az / 45) % 8]);
 const DIRS_EN = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 const dirShort = az => (getLang() === 'tr' ? DIRS : DIRS_EN)[Math.round(az / 45) % 8];
-const fists = alt => Math.max(0, Math.round(alt / 10));
-const whereText = (az, alt) => `${dirName(az)}, ${alt > 75 ? t('gece.overhead') : (fists(alt) <= 1 ? t('gece.above1') : t('gece.above', { n: fists(alt) }))}`;
+// Bir yumruk ≈ 10°. Listede ve göstergede aynı sayı görünsün diye tek yerden hesaplanır (1…9).
+const OVERHEAD = 75;
+const fists = alt => Math.min(9, Math.max(1, Math.round(alt / 10)));
+const whereText = (az, alt) => `${dirName(az)}, ${alt > OVERHEAD ? t('gece.overhead') : (fists(alt) === 1 ? t('gece.above1') : t('gece.above', { n: fists(alt) }))}`;
 const cap = s => s.charAt(0).toLocaleUpperCase(locale()) + s.slice(1);
 const fmtNum = (n, d = 1) => n.toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
 const fmtMag = m => (m < 0 ? '−' : '') + fmtNum(Math.abs(m));
@@ -163,25 +165,46 @@ function viewBak() {
     lastCardKey = ''; lastDrawKey = '';
   };
   if (state.sensor === 'off') {
-    document.getElementById('card').innerHTML = `
-      <button class="start" id="startBtn" type="button"><span>${t('bak.start')}</span><span>→</span></button>
-      <p class="pad t-veri soluk" style="margin-top:12px">${t('bak.startHint')}</p>`;
-    document.getElementById('startBtn').onclick = startLooking;
+    if (state.needsTap) showStartButton();
+    else {
+      document.getElementById('card').innerHTML = `<div class="cevap"><span class="t-etiket">${upper(t('bak.starting'))}</span></div>`;
+      startLooking(true);
+    }
   }
   enableDrag();
   loop();
 }
 
-async function startLooking() {
-  // iOS: izin isteği bir dokunuşun içinden yapılmalı, bu yüzden önce yön sensörünü başlatıyoruz
-  const live = await startOrientation(v => {
+// Sadece iOS'ta gerekir: Apple yön sensörü iznini ancak bir dokunuşla istemeye izin veriyor
+function showStartButton() {
+  const card = document.getElementById('card');
+  if (!card) return;
+  card.innerHTML = `
+    <button class="start" id="startBtn" type="button"><span>${t('bak.start')}</span><span>→</span></button>
+    <p class="pad t-veri soluk" style="margin-top:12px">${t('bak.startHint')}</p>`;
+  document.getElementById('startBtn').onclick = () => startLooking(false);
+}
+
+// auto: açılışta dokunuşsuz deneme. İzin dokunuş gerektirirse butona düşer.
+async function startLooking(auto) {
+  if (state.starting) return;
+  state.starting = true;
+  // Önce yön sensörü: iOS'ta izin isteği dokunuşun hemen içinde yapılmalı
+  const res = await startOrientation(v => {
     const s = state.vec, k = 0.15; // basit yumuşatma
     state.vec = s ? { east: s.east + (v.east - s.east) * k, north: s.north + (v.north - s.north) * k, up: s.up + (v.up - s.up) * k } : v;
     state.dir = toAzAlt(state.vec);
   });
+  if (auto && res === 'denied') {
+    state.starting = false;
+    state.needsTap = true;
+    if (location.hash.replace('#', '') === 'bak' || location.hash === '') showStartButton();
+    return;
+  }
   await ensureLocation();
   refreshSky(true);
-  state.sensor = live ? 'live' : 'drag';
+  state.sensor = res === 'live' ? 'live' : 'drag';
+  state.starting = false;
   lastCardKey = '';
 }
 
@@ -317,23 +340,46 @@ async function viewGece() {
   const now = skyNow();
   const { win, items } = sky.tonight(now, state.obs);
   const date = upper(now.toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' }));
-  const sunLine = win ? (now > win.sunset ? t('gece.sunsetPast', { t: hhmm(win.sunset) }) : t('gece.sunset', { t: hhmm(win.sunset) })) : '';
   const city = state.loc.manual && CITIES.find(c => c.id === state.loc.city);
-  const placeText = city ? city.name : state.loc.fallback ? t('gece.defaultLoc') : `${state.loc.lat.toFixed(1)}°, ${state.loc.lon.toFixed(1)}°`;
-  const place = `<label class="yer">${esc(placeText)} <span class="soluk">▾ ${t('yer.change')}</span>
-    <select id="yer" aria-label="${t('yer.label')}">
-      <option value="gps"${city ? '' : ' selected'}>${t('yer.gps')}</option>
-      ${CITIES.map(c => `<option value="${c.id}"${city === c ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}
-    </select></label>`;
+  const near = !state.loc.manual && !state.loc.fallback && nearestCity(state.loc);
+  const placeName = city ? city.name
+    : state.loc.fallback ? t('yer.default')
+    : near ? t('yer.near', { c: near.name }) : t('yer.here');
+  const placeSub = state.loc.fallback ? t('yer.noGps') : coords(state.loc);
   $view.innerHTML = `
     <div class="gece-head">
       <span class="t-etiket">${date}</span>
       <h1 class="t-buyuk">${t('gece.title')}</h1>
-      <p class="t-veri">${place} · ${sunLine} · ${t('gece.moon', { p: sky.moonPercent(now) })}</p>
+    </div>
+    <label class="konum">
+      <span class="konum-metin">
+        <span class="t-etiket">${t('yer.label')}</span>
+        <span class="konum-ad">${esc(placeName)}</span>
+        <span class="t-veri">${esc(placeSub)}</span>
+      </span>
+      <span class="t-etiket kirmizi">${upper(t('yer.change'))} ▾</span>
+      <select id="yer" aria-label="${t('yer.label')}">
+        <option value="gps"${city ? '' : ' selected'}>${t('yer.gps')}</option>
+        ${CITIES.map(c => `<option value="${c.id}"${city === c ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}
+      </select>
+    </label>
+    <div class="ozet">
+      <div><span class="t-etiket">${t('gece.sunsetLbl')}</span><span>${win ? hhmm(win.sunset) : '—'}</span></div>
+      <div><span class="t-etiket">${t('gece.sunriseLbl')}</span><span>${win ? hhmm(win.sunrise) : '—'}</span></div>
+      <div><span class="t-etiket">${t('gece.moonLbl')}</span><span>${t('gece.moonPct', { p: sky.moonPercent(now) })}</span></div>
     </div>
     ${items.length ? `<ul class="kayitlar">${items.map(kayit).join('')}</ul>` : `<p class="bos t-not">${t('gece.empty')}</p>`}
     <p class="ipucu"><b>${t('gece.fist')}</b><span>${t('gece.hint')}</span></p>`;
   document.getElementById('yer').onchange = e => changePlace(e.target.value);
+}
+
+const coords = loc => `${fmtNum(Math.abs(loc.lat))}° ${t(loc.lat >= 0 ? 'yer.N' : 'yer.S')} · ${fmtNum(Math.abs(loc.lon))}° ${t(loc.lon >= 0 ? 'yer.E' : 'yer.W')}`;
+
+// GPS konumuna 60 km'den yakın listedeki şehir (koordinat yerine "İstanbul yakını" demek için)
+function nearestCity(loc) {
+  const km = c => 111 * Math.hypot(c.lat - loc.lat, (c.lon - loc.lon) * Math.cos(loc.lat * Math.PI / 180));
+  const best = CITIES.reduce((a, c) => (km(c) < km(a) ? c : a));
+  return km(best) < 60 ? best : null;
 }
 
 async function changePlace(id) {
@@ -345,17 +391,21 @@ async function changePlace(id) {
 }
 
 function kayit(i) {
-  const n = Math.min(4, Math.max(1, fists(i.alt)));
+  const n = fists(i.alt);
+  const overhead = i.alt > OVERHEAD;
   const note = i.obj.body ? (i.sets ? t('gece.sets', { t: hhmm(i.sets) }) : cap(L(i.obj.alias))) : L(i.obj.note);
+  // Şimdi görünür / hava kararınca görünür / gece içinde yükselir
+  const tag = i.isNow ? `<small class="kirmizi">${upper(t('gece.now'))}</small>`
+    : `<small>${upper(t(i.atStart ? 'gece.atDusk' : 'gece.rises'))}</small>`;
   return `
     <li><a class="kayit" href="#cisim/${i.obj.id}">
-      <span class="saat${i.isNow ? ' simdi' : ''}">${i.isNow && !clock.offset ? t('gece.now') : hhmm(i.time)}</span>
+      <span class="saat"><b>${hhmm(i.time)}</b>${tag}</span>
       <span>
         <span class="ad">${esc(L(i.obj.name))}</span><br>
         <span class="yon">${whereText(i.az, i.alt)}</span><br>
         <span class="not">${esc(note)}</span>
       </span>
-      <span class="ufuk" aria-hidden="true"><span class="cetvel"></span><span class="nokta" style="top:${45 - n * 10}px"></span><span class="ymr">${n} ${t('gece.fist')}</span></span>
+      <span class="ufuk" aria-hidden="true"><span class="cetvel"></span><span class="nokta" style="top:${overhead ? 0 : 45 - n * 5}px"></span><span class="ymr">${overhead ? upper(t('gece.top')) : upper(t(n === 1 ? 'gece.fist1' : 'gece.fistN', { n }))}</span></span>
     </a></li>`;
 }
 

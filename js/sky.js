@@ -86,7 +86,8 @@ export function tonight(now, obs, max = 6) {
       if (!obj.body && t > win.start.getTime() + 4 * 3600e3) break; // yıldızlar: sadece akşamın ilk saatleri
       if (p.alt >= 10 && p.mag <= 3) {
         const sets = obj.body ? A.SearchRiseSet(obj.body, obs, -1, d, 1)?.date : null;
-        items.push({ obj, time: d, isNow: t === win.start.getTime() && now >= win.start, ...p,
+        const atStart = t === win.start.getTime();
+        items.push({ obj, time: d, atStart, isNow: atStart && now >= win.start, ...p,
                      sets: sets && sets < win.end ? sets : null });
         break;
       }

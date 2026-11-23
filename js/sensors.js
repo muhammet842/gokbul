@@ -61,12 +61,16 @@ export const toAzAlt = v => {
   };
 };
 
-// Yön verisi gelirse true döner. iOS'ta bu fonksiyon bir dokunuşun içinden çağrılmalı.
+// Yön sensörünü başlatır. Sonuç:
+//   'live'   yön verisi geliyor
+//   'denied' izin verilmedi ya da izin bir dokunuş gerektiriyor (iOS Safari, dokunuşsuz çağrılınca)
+//   'none'   cihazda pusula yok (masaüstü)
+// Android Chrome izni dokunuşsuz verir; bu yüzden açılışta kendiliğinden denenebilir.
 export async function startOrientation(onVector) {
-  if (typeof DeviceOrientationEvent === 'undefined') return false;
+  if (typeof DeviceOrientationEvent === 'undefined') return 'none';
   if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-    try { if (await DeviceOrientationEvent.requestPermission() !== 'granted') return false; }
-    catch { return false; }
+    try { if (await DeviceOrientationEvent.requestPermission() !== 'granted') return 'denied'; }
+    catch { return 'denied'; }
   }
   let got = false;
   const handler = e => {
@@ -80,5 +84,5 @@ export async function startOrientation(onVector) {
   window.addEventListener(type, handler);
   await new Promise(r => setTimeout(r, 1200));
   if (!got) window.removeEventListener(type, handler);
-  return got;
+  return got ? 'live' : 'none';
 }
