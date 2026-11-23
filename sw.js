@@ -2,7 +2,7 @@
 // Uygulama dosyaları: önce ağ (yeni sürüm hemen gelsin), ağ yoksa ya da yavaşsa önbellek.
 // Yazı tipleri gibi dış dosyalar: önce önbellek (değişmezler).
 // VERSION'ı sadece SHELL listesi değişince artırman yeterli; dosya içerikleri kendiliğinden tazelenir.
-const VERSION = 'gokbul-v5';
+const VERSION = 'gokbul-v6';
 const SHELL = [
   './', 'index.html', 'css/style.css', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
@@ -30,7 +30,9 @@ function save(req, res) {
 }
 
 function networkFirst(req) {
-  const net = fetch(req).then(res => save(req, res));
+  // no-cache: tarayıcının kendi önbelleğini atla, sunucuya "değişti mi?" diye sor.
+  // GitHub Pages dosyaları 10 dk önbellekte tutturuyor; yoksa yeni sürüm telefona 10 dk geç gelirdi.
+  const net = fetch(req, { cache: 'no-cache' }).then(res => save(req, res));
   const timeout = new Promise(r => setTimeout(r, NETWORK_TIMEOUT));
   const cached = () => caches.match(req, { ignoreSearch: true });
   // Zaman aşımında önbellekteki varsa onu ver; yoksa ağı beklemeye devam et
