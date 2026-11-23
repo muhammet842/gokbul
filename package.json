@@ -1,0 +1,10 @@
+{
+  "name": "gokbul",
+  "private": true,
+  "type": "module",
+  "description": "GökBul: gökyüzündeki parlak nokta ne? Derleme adımı yok; bu dosya sadece testler için.",
+  "scripts": {
+    "test": "node --test tests/",
+    "serve": "python -m http.server 8765"
+  }
+}

@@ -2,10 +2,30 @@
 
 const ANKARA = { lat: 39.925, lon: 32.837, fallback: true };
 
+// Konum izni verilmezse (okullarda sık olur) elle seçilebilecek şehirler
+export const CITIES = [
+  ['adana', 'Adana', 37.00, 35.32], ['ankara', 'Ankara', 39.93, 32.86], ['antalya', 'Antalya', 36.90, 30.70],
+  ['bursa', 'Bursa', 40.19, 29.06], ['diyarbakir', 'Diyarbakır', 37.91, 40.24], ['erzurum', 'Erzurum', 39.90, 41.27],
+  ['eskisehir', 'Eskişehir', 39.78, 30.52], ['gaziantep', 'Gaziantep', 37.07, 37.38], ['istanbul', 'İstanbul', 41.01, 28.98],
+  ['izmir', 'İzmir', 38.42, 27.14], ['kayseri', 'Kayseri', 38.73, 35.48], ['konya', 'Konya', 37.87, 32.48],
+  ['malatya', 'Malatya', 38.35, 38.31], ['samsun', 'Samsun', 41.29, 36.33], ['trabzon', 'Trabzon', 41.00, 39.72],
+  ['van', 'Van', 38.50, 43.38],
+].map(([id, name, lat, lon]) => ({ id, name, lat, lon }));
+
+// Elle şehir seç (city: CITIES'ten biri) ya da null ile seçimi kaldırıp yeniden GPS'e dön
+export function setManualLocation(city) {
+  try {
+    if (city) localStorage.setItem('gokbul.loc', JSON.stringify({ lat: city.lat, lon: city.lon, city: city.id, manual: true }));
+    else localStorage.removeItem('gokbul.loc');
+  } catch {}
+  return city ? { lat: city.lat, lon: city.lon, city: city.id, manual: true } : null;
+}
+
 export function getLocation() {
   return new Promise(resolve => {
     try {
       const saved = JSON.parse(localStorage.getItem('gokbul.loc'));
+      if (saved?.manual) return resolve(saved); // elle seçilen şehir GPS'le ezilmesin
       if (saved) resolve({ ...saved, cached: true }); // hızlı başlangıç; aşağıda tazelenir
     } catch {}
     if (!navigator.geolocation) return resolve(ANKARA);

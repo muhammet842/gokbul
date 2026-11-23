@@ -9,7 +9,14 @@ Tasarım taslağı (Figma): https://www.figma.com/design/0SRMOugamIOCJKef3KDSc9
 ## Güncelleme yayınlama
 
 `main` dalına her `git push` yapıldığında GitHub Pages siteyi bir iki dakika içinde kendiliğinden günceller.
-Telefonlarda eski sürüm kalmasın diye `sw.js` içindeki `VERSION` değerini her seferinde artır (`gokbul-v1` → `gokbul-v2`).
+Servis çalışanı uygulama dosyalarını önce ağdan ister, bu yüzden telefonlar yeni sürümü kendiliğinden alır.
+`sw.js` içindeki `VERSION` değerini (`gokbul-v4` → `gokbul-v5`) sadece `SHELL` listesine dosya ekleyip çıkardığında artırman yeterli.
+
+Push etmeden önce testleri çalıştır (Node 20+ yeterli, kurulum gerekmez):
+
+```bash
+npm test
+```
 
 > Vercel'de de bir kopya var (gokbul.vercel.app), ama bazı mobil operatörler `vercel.app` adreslerini engellediği için
 > paylaşılacak adres GitHub Pages adresidir.
@@ -47,12 +54,15 @@ Sonra tarayıcıda `http://localhost:8765` aç.
 ```
 index.html            Sayfa iskeleti, üst çubuk ve alt menü
 css/style.css         Tasarım: renkler (Figma değişkenleriyle aynı), yazı tipleri, ekranlar
+icons/                SVG ikon + ana ekran için PNG'ler (180 iOS, 192/512 Android)
 js/app.js             Ekranlar ve yönlendirme (#bak, #gece, #sor, #cisim/venus)
 js/sky.js             Gökyüzü hesapları (astronomy-engine kütüphanesi ile)
-js/sensors.js         Konum ve telefon yönü (pusula + jiroskop)
+js/sensors.js         Konum (GPS ya da elle seçilen şehir) ve telefon yönü (pusula + jiroskop)
 js/objects.js         Gök cisimleri ve bilgileri (TR/EN)
 js/i18n.js            Arayüz metinleri (TR/EN)
 sw.js                 Çevrimdışı çalışma (dosya eklersen SHELL listesine ekle, VERSION'ı artır)
+vendor/               astronomy-engine 2.1.19 (CDN yerine projede; çevrimdışı ve güvenli)
+tests/                Gökyüzü hesapları ve TR/EN metin testleri (npm test)
 ```
 
 ## Tasarım kuralları

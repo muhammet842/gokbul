@@ -1,7 +1,7 @@
 import { t, L, upper, getLang, setLang, locale } from './i18n.js';
 import { byId, TYPE_LABEL } from './objects.js';
 import * as sky from './sky.js';
-import { getLocation, startOrientation, toAzAlt } from './sensors.js';
+import { getLocation, startOrientation, toAzAlt, CITIES, setManualLocation } from './sensors.js';
 
 const $view = document.getElementById('view');
 const state = {
@@ -10,6 +10,7 @@ const state = {
   vec: null,                // yumuşatılmış yön vektörü
   dir: { az: 247, alt: 18 },
   sky: [], skyAt: 0,
+  pick: null,               // halkada birden çok cisim varken kullanıcının seçtiği
   quiz: { step: 'move', answers: [], hint: false, result: null },
 };
 
@@ -30,8 +31,14 @@ const matchPct = sep => Math.round(100 * Math.exp(-((sep / 10) ** 2)));
 
 async function ensureLocation() {
   if (state.loc) return;
-  state.loc = await getLocation();
-  state.obs = sky.makeObserver(state.loc);
+  useLocation(await getLocation());
+}
+
+function useLocation(loc) {
+  state.loc = loc;
+  state.obs = sky.makeObserver(loc);
+  state.skyAt = 0;
+  lastCardKey = '';
 }
 
 function refreshSky(force) {
@@ -131,7 +138,8 @@ function applyTheme(theme) {
 const savedTheme = () => { try { return localStorage.getItem('gokbul.theme'); } catch { return null; } };
 
 // ---------- 01 · Bak ----------
-let raf = 0, lastCardKey = '';
+let raf = 0, lastCardKey = '', lastDrawKey = '', lastDrawAt = 0;
+const FRAME_MS = 33; // en fazla ~30 kare/sn: gece uzun süre açık kalınca pil bitmesin
 
 function viewBak() {
   $view.innerHTML = `
@@ -146,7 +154,14 @@ function viewBak() {
       <div class="alt-row"><span class="t-etiket">${t('bak.horizon')}</span><span class="t-etiket" id="altText"></span></div>
     </div>
     <section id="card"></section>`;
-  lastCardKey = '';
+  lastCardKey = ''; lastDrawKey = '';
+  // Halkadaki cisimlerden birine dokununca hedef o olsun
+  document.getElementById('card').onclick = e => {
+    const b = e.target.closest('[data-pick]');
+    if (!b) return;
+    state.pick = b.dataset.pick;
+    lastCardKey = ''; lastDrawKey = '';
+  };
   if (state.sensor === 'off') {
     document.getElementById('card').innerHTML = `
       <button class="start" id="startBtn" type="button"><span>${t('bak.start')}</span><span>→</span></button>
@@ -187,12 +202,19 @@ const PX = 6; // derece başına piksel (vizör ve cetvel aynı ölçek)
 function loop() {
   cancelAnimationFrame(raf);
   if (location.hash.replace('#', '') !== 'bak' && location.hash !== '') return;
+  raf = requestAnimationFrame(loop);
+  const t0 = performance.now();
+  if (t0 - lastDrawAt < FRAME_MS) return;
   if (state.obs) refreshSky();
   const { az, alt } = state.dir;
+  // Yön 0,1°'den az değiştiyse ve gökyüzü aynıysa yeniden çizmeye gerek yok
+  const key = [Math.round(az * 10), Math.round(alt * 10), state.skyAt, state.sensor, state.pick].join('|');
+  if (key === lastDrawKey) return;
+  lastDrawKey = key; lastDrawAt = t0;
+  const hits = state.sensor !== 'off' ? ringHits(az, alt) : [];
   drawRuler(az);
-  drawVizor(az, alt);
-  if (state.sensor !== 'off') drawCard(az, alt);
-  raf = requestAnimationFrame(loop);
+  drawVizor(az, alt, hits);
+  if (state.sensor !== 'off') drawCard(hits);
 }
 
 function drawRuler(az) {
@@ -207,33 +229,62 @@ function drawRuler(az) {
   document.getElementById('heading').textContent = `${dirShort(az)} ${Math.round(az)}°`;
 }
 
-function drawVizor(az, alt) {
+// Halkadaki cisimler, hedef başta. Kullanıcı birini seçtiyse o halkada kaldıkça hedef odur.
+function ringHits(az, alt) {
+  const hits = sky.identify(az, alt, state.sky);
+  if (state.pick) {
+    const i = hits.findIndex(h => h.obj.id === state.pick);
+    if (i < 0) state.pick = null;               // halkadan çıktı: seçimi unut
+    else if (i > 0) hits.unshift(...hits.splice(i, 1));
+  }
+  return hits;
+}
+
+// Etiketler üst üste binmesin: çakışırsa aşağı/yukarı kaydır. y metnin taban çizgisi.
+function placeLabel(boxes, x, y, w, h) {
+  for (const dy of [0, 13, -13, 26, -26, 39]) {
+    const b = { x, y: y + dy - h, w, h };
+    if (!boxes.some(o => b.x < o.x + o.w && o.x < b.x + b.w && b.y < o.y + o.h && o.y < b.y + b.h)) { boxes.push(b); return y + dy; }
+  }
+  return null; // yer yok: bu etiketi çizme
+}
+
+function drawVizor(az, alt, hits) {
   const g = document.getElementById('stars');
   if (!g) return;
-  const best = state.sensor !== 'off' ? sky.identify(az, alt, state.sky)[0] : null;
-  let html = '';
-  for (const p of state.sky) {
+  const best = hits[0]?.obj;
+  const inRing = new Set(hits.map(h => h.obj));
+  // Önce hedef, sonra halkadakiler, sonra parlaklığa göre: etiket yerini önemli olan alsın
+  const rank = p => (p.obj === best ? -100 : inRing.has(p.obj) ? -50 : 0) + p.mag;
+  const pts = state.sky.map(p => {
     const daz = ((p.az - az + 540) % 360) - 180;
-    const x = 195 + daz * Math.cos(p.alt * Math.PI / 180) * PX;
-    const y = 150 - (p.alt - alt) * PX;
-    if (x < -20 || x > 410 || y < -20 || y > 320) continue;
-    const r = Math.max(1.2, (2.5 - p.mag) * 0.9);
-    const isBest = best && best.obj === p.obj;
-    html += `<circle cx="${x}" cy="${y}" r="${r}" fill="var(${isBest ? '--murekkep' : '--murekkep-2'})"/>`;
-    if (isBest) html += `<circle cx="${x}" cy="${y}" r="${r + 10}" fill="none" stroke="var(--kirmizi)" stroke-dasharray="3 3"/>`;
-    else html += `<text x="${x + r + 5}" y="${y + 4}" font-family="IBM Plex Mono" font-size="10" fill="var(--murekkep-3)">${esc(L(p.obj.name))}</text>`;
+    return { p, x: 195 + daz * Math.cos(p.alt * Math.PI / 180) * PX, y: 150 - (p.alt - alt) * PX, r: Math.max(1.2, (2.5 - p.mag) * 0.9) };
+  }).filter(d => d.x >= -20 && d.x <= 410 && d.y >= -20 && d.y <= 320)
+    .sort((a, b) => rank(a.p) - rank(b.p));
+  const boxes = pts.map(d => ({ x: d.x - d.r, y: d.y - d.r, w: 2 * d.r, h: 2 * d.r })); // noktaların üstüne yazma
+  let dots = '', labels = '';
+  for (const { p, x, y, r } of pts) {
+    const isBest = p.obj === best, ring = inRing.has(p.obj);
+    dots += `<circle cx="${x}" cy="${y}" r="${r}" fill="var(${isBest || ring ? '--murekkep' : '--murekkep-2'})"/>`;
+    if (isBest) dots += `<circle cx="${x}" cy="${y}" r="${r + 10}" fill="none" stroke="var(--kirmizi)" stroke-dasharray="3 3"/>`;
+    const size = isBest ? 13 : ring ? 11 : 10;
+    const name = L(p.obj.name);
+    const lx = x + r + (isBest ? 13 : 5); // hedefin etiketi kesik çemberin dışında başlasın
+    const ly = placeLabel(boxes, lx, y + size / 3, name.length * size * 0.6, size);
+    if (ly == null) continue;
+    const fill = isBest ? '--kirmizi' : ring ? '--murekkep-2' : '--murekkep-3';
+    labels += `<text x="${lx}" y="${ly}" font-family="IBM Plex Mono" font-size="${size}"${isBest ? ' font-weight="500"' : ''} fill="var(${fill})">${esc(name)}</text>`;
   }
-  g.innerHTML = html;
+  g.innerHTML = dots + labels;
   const hy = 150 + alt * PX;
   const h = document.getElementById('horizon');
   h.setAttribute('y1', hy); h.setAttribute('y2', hy);
   document.getElementById('altText').textContent = alt < 0 ? t('bak.below') : `${t('bak.altitude')} ${Math.round(alt)}°`;
 }
 
-function drawCard(az, alt) {
-  const hits = sky.identify(az, alt, state.sky);
-  const [best, second] = hits;
-  const key = [best?.obj.id, second?.obj.id, getLang(), best && Math.round(best.sep * 2)].join('|');
+function drawCard(hits) {
+  const best = hits[0];
+  const key = [hits.slice(0, 4).map(h => h.obj.id + Math.round(h.sep)).join(','), getLang(), best && Math.round(best.sep * 2)].join('|');
   if (key === lastCardKey) return;
   lastCardKey = key;
   const card = document.getElementById('card');
@@ -242,17 +293,19 @@ function drawCard(az, alt) {
     return;
   }
   const o = best.obj;
-  const steady = o.body ? (getLang() === 'tr' ? 'titreşmez' : 'steady') : (getLang() === 'tr' ? 'titreşir' : 'twinkles');
+  const steady = t(o.body ? 'bak.steady' : 'bak.twinkles');
   card.innerHTML = `
     <div class="cevap">
       <div class="row"><span class="t-etiket kirmizi">${upper(t('bak.match', { p: matchPct(best.sep) }))}</span><span class="t-etiket">${upper(t('bak.offset', { d: fmtNum(best.sep) }))}</span></div>
       <h1 class="t-dev">${esc(L(o.name))}</h1>
       <p class="t-veri">${L(TYPE_LABEL[o.type])} · ${fmtMag(best.mag)} ${t('cisim.magUnit')} · ${steady}</p>
       <p class="t-not">${esc(L(o.note))}</p>
-      <div class="row" style="padding-top:6px">
-        <a class="link" href="#cisim/${o.id}">${t('bak.why')}</a>
-        ${second ? `<span class="t-veri soluk" style="font-size:10px">${t('bak.other')}: ${esc(L(second.obj.name))} · ${fmtNum(second.sep, 0)}°</span>` : ''}
-      </div>
+      <div class="row" style="padding-top:6px"><a class="link" href="#cisim/${o.id}">${t('bak.why')}</a></div>
+      ${hits.length > 1 ? `
+      <div class="secim">
+        <span class="t-etiket">${upper(t('bak.ring', { n: Math.min(hits.length, 4) }))}</span>
+        <div>${hits.slice(0, 4).map((h, i) => `<button type="button" data-pick="${h.obj.id}" aria-pressed="${i === 0}"${i === 0 ? ' class="on"' : ''}>${esc(L(h.obj.name))} <small>${fmtNum(h.sep, 0)}°</small></button>`).join('')}</div>
+      </div>` : ''}
     </div>`;
 }
 
@@ -265,7 +318,13 @@ async function viewGece() {
   const { win, items } = sky.tonight(now, state.obs);
   const date = upper(now.toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' }));
   const sunLine = win ? (now > win.sunset ? t('gece.sunsetPast', { t: hhmm(win.sunset) }) : t('gece.sunset', { t: hhmm(win.sunset) })) : '';
-  const place = state.loc.fallback ? t('gece.defaultLoc') : `${state.loc.lat.toFixed(1)}°, ${state.loc.lon.toFixed(1)}°`;
+  const city = state.loc.manual && CITIES.find(c => c.id === state.loc.city);
+  const placeText = city ? city.name : state.loc.fallback ? t('gece.defaultLoc') : `${state.loc.lat.toFixed(1)}°, ${state.loc.lon.toFixed(1)}°`;
+  const place = `<label class="yer">${esc(placeText)} <span class="soluk">▾ ${t('yer.change')}</span>
+    <select id="yer" aria-label="${t('yer.label')}">
+      <option value="gps"${city ? '' : ' selected'}>${t('yer.gps')}</option>
+      ${CITIES.map(c => `<option value="${c.id}"${city === c ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}
+    </select></label>`;
   $view.innerHTML = `
     <div class="gece-head">
       <span class="t-etiket">${date}</span>
@@ -274,6 +333,15 @@ async function viewGece() {
     </div>
     ${items.length ? `<ul class="kayitlar">${items.map(kayit).join('')}</ul>` : `<p class="bos t-not">${t('gece.empty')}</p>`}
     <p class="ipucu"><b>${t('gece.fist')}</b><span>${t('gece.hint')}</span></p>`;
+  document.getElementById('yer').onchange = e => changePlace(e.target.value);
+}
+
+async function changePlace(id) {
+  const city = CITIES.find(c => c.id === id);
+  if (city) useLocation(setManualLocation(city));
+  else { setManualLocation(null); state.loc = null; await ensureLocation(); }
+  refreshSky(true);
+  viewGece();
 }
 
 function kayit(i) {
