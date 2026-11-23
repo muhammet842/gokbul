@@ -1,6 +1,7 @@
 import { t, L, upper, getLang, setLang, locale } from './i18n.js';
-import { byId, TYPE_LABEL } from './objects.js';
+import { byId, TYPE_LABEL, SATS } from './objects.js';
 import * as sky from './sky.js';
+import * as sats from './satellites.js';
 import { getLocation, startOrientation, toAzAlt, CITIES, setManualLocation } from './sensors.js';
 
 const $view = document.getElementById('view');
@@ -10,6 +11,7 @@ const state = {
   vec: null,                // yumuşatılmış yön vektörü
   dir: { az: 247, alt: 18 },
   sky: [], skyAt: 0,
+  sats: [], satsAt: 0,      // şu an görünen uzay istasyonları (hızlı hareket ettikleri için sık tazelenir)
   pick: null,               // halkada birden çok cisim varken kullanıcının seçtiği
   quiz: { step: 'move', answers: [], hint: false, result: null },
 };
@@ -25,6 +27,8 @@ const dirShort = az => (getLang() === 'tr' ? DIRS : DIRS_EN)[Math.round(az / 45)
 const OVERHEAD = 75;
 const fists = alt => Math.min(9, Math.max(1, Math.round(alt / 10)));
 const whereText = (az, alt) => `${dirName(az)}, ${alt > OVERHEAD ? t('gece.overhead') : (fists(alt) === 1 ? t('gece.above1') : t('gece.above', { n: fists(alt) }))}`;
+// İstasyon geçişinin yönü: "Batı → Kuzeydoğu"; başı ve sonu aynı yöndeyse tek yön
+const passDir = (a, b) => (dirName(a) === dirName(b) ? dirName(a) : `${dirName(a)} → ${dirName(b)}`);
 const cap = s => s.charAt(0).toLocaleUpperCase(locale()) + s.slice(1);
 const fmtNum = (n, d = 1) => n.toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
 const fmtMag = m => (m < 0 ? '−' : '') + fmtNum(Math.abs(m));
@@ -48,6 +52,15 @@ function refreshSky(force) {
   state.skyAt = now;
 }
 
+// İstasyonlar saniyede ~1° yol alır: yerlerini yarım saniyede bir yeniden hesapla
+function refreshSats(force) {
+  const now = Date.now();
+  if (!force && now - state.satsAt < 500) return;
+  state.sats = sats.visibleSats(skyNow(), state.loc, state.obs);
+  state.satsAt = now;
+}
+const skyList = () => (state.sats.length ? [...state.sky, ...state.sats] : state.sky);
+
 // ---------- Zaman makinesi ----------
 // Gökyüzü hesaplarındaki "şimdi". offset 0 ise gerçek saat; değilse ileri/geri alınmış saat akmaya devam eder.
 const clock = { offset: 0, open: false };
@@ -64,7 +77,7 @@ function eveningBase() {
 
 function setSkyTime(date) {
   clock.offset = date ? date.getTime() - Date.now() : 0;
-  state.skyAt = 0;
+  state.skyAt = 0; state.satsAt = 0;
   lastCardKey = '';
 }
 
@@ -227,10 +240,10 @@ function loop() {
   raf = requestAnimationFrame(loop);
   const t0 = performance.now();
   if (t0 - lastDrawAt < FRAME_MS) return;
-  if (state.obs) refreshSky();
+  if (state.obs) { refreshSky(); refreshSats(); }
   const { az, alt } = state.dir;
   // Yön 0,1°'den az değiştiyse ve gökyüzü aynıysa yeniden çizmeye gerek yok
-  const key = [Math.round(az * 10), Math.round(alt * 10), state.skyAt, state.sensor, state.pick].join('|');
+  const key = [Math.round(az * 10), Math.round(alt * 10), state.skyAt, state.sats.length ? state.satsAt : 0, state.sensor, state.pick].join('|');
   if (key === lastDrawKey) return;
   lastDrawKey = key; lastDrawAt = t0;
   const hits = state.sensor !== 'off' ? ringHits(az, alt) : [];
@@ -253,7 +266,7 @@ function drawRuler(az) {
 
 // Halkadaki cisimler, hedef başta. Kullanıcı birini seçtiyse o halkada kaldıkça hedef odur.
 function ringHits(az, alt) {
-  const hits = sky.identify(az, alt, state.sky);
+  const hits = sky.identify(az, alt, skyList());
   if (state.pick) {
     const i = hits.findIndex(h => h.obj.id === state.pick);
     if (i < 0) state.pick = null;               // halkadan çıktı: seçimi unut
@@ -278,7 +291,7 @@ function drawVizor(az, alt, hits) {
   const inRing = new Set(hits.map(h => h.obj));
   // Önce hedef, sonra halkadakiler, sonra parlaklığa göre: etiket yerini önemli olan alsın
   const rank = p => (p.obj === best ? -100 : inRing.has(p.obj) ? -50 : 0) + p.mag;
-  const pts = state.sky.map(p => {
+  const pts = skyList().map(p => {
     const daz = ((p.az - az + 540) % 360) - 180;
     return { p, x: 195 + daz * Math.cos(p.alt * Math.PI / 180) * PX, y: 150 - (p.alt - alt) * PX, r: Math.max(1.2, (2.5 - p.mag) * 0.9) };
   }).filter(d => d.x >= -20 && d.x <= 410 && d.y >= -20 && d.y <= 320)
@@ -312,7 +325,7 @@ function drawCard(hits) {
   const card = document.getElementById('card');
   if (!best) { card.innerHTML = ''; return; } // halkada cisim yoksa kart boş kalır
   const o = best.obj;
-  const steady = t(o.body ? 'bak.steady' : 'bak.twinkles');
+  const steady = t(o.sat ? 'bak.moving' : o.body ? 'bak.steady' : ['kume', 'galaksi', 'bulutsu'].includes(o.type) ? 'bak.fuzzy' : 'bak.twinkles');
   card.innerHTML = `
     <div class="cevap">
       <h1 class="t-dev">${esc(L(o.name))}</h1>
@@ -334,6 +347,9 @@ async function viewGece() {
   refreshSky(true);
   const now = skyNow();
   const { win, items } = sky.tonight(now, state.obs);
+  const passList = win && win.start < win.end
+    ? SATS.flatMap(s => sats.passes(s, win.start, win.end, state.loc, state.obs).slice(0, 3)) : [];
+  const rows = [...items, ...passList.map(p => ({ pass: p, time: p.start }))].sort((a, b) => a.time - b.time);
   const date = upper(now.toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' }));
   const city = state.loc.manual && CITIES.find(c => c.id === state.loc.city);
   const near = !state.loc.manual && !state.loc.fallback && nearestCity(state.loc);
@@ -363,7 +379,7 @@ async function viewGece() {
       <div><span class="t-etiket">${t('gece.sunriseLbl')}</span><span>${win ? hhmm(win.sunrise) : '—'}</span></div>
       <div><span class="t-etiket">${t('gece.moonLbl')}</span><span>${t('gece.moonPct', { p: sky.moonPercent(now) })}</span></div>
     </div>
-    ${items.length ? `<ul class="kayitlar">${items.map(kayit).join('')}</ul>` : `<p class="bos t-not">${t('gece.empty')}</p>`}
+    ${rows.length ? `<ul class="kayitlar">${rows.map(r => (r.pass ? kayitPass(r.pass) : kayit(r))).join('')}</ul>` : `<p class="bos t-not">${t('gece.empty')}</p>`}
     <p class="ipucu"><b>${t('gece.fist')}</b><span>${t('gece.hint')}</span></p>`;
   document.getElementById('yer').onchange = e => changePlace(e.target.value);
 }
@@ -385,9 +401,30 @@ async function changePlace(id) {
   viewGece();
 }
 
+// Sağdaki küçük gösterge: ufuktan tepeye 9 çentik, her biri bir yumruk
+function gauge(alt) {
+  const n = fists(alt), overhead = alt > OVERHEAD;
+  return `<span class="ufuk" aria-hidden="true"><span class="cetvel"></span><span class="nokta" style="top:${overhead ? 0 : 45 - n * 5}px"></span><span class="ymr">${overhead ? upper(t('gece.top')) : upper(t(n === 1 ? 'gece.fist1' : 'gece.fistN', { n }))}</span></span>`;
+}
+
+// İstasyon geçişi: ne zaman, hangi yönden hangi yöne, ne kadar sürer, en yüksek nokta
+function kayitPass(p) {
+  const now = skyNow();
+  const live = now >= p.start && now <= p.end;
+  const mins = Math.max(1, Math.round((p.end - p.start) / 60e3));
+  return `
+    <li><a class="kayit" href="#cisim/${p.obj.id}">
+      <span class="saat"><b>${hhmm(p.start)}</b><small${live ? ' class="kirmizi"' : ''}>${upper(t(live ? 'gece.now' : 'gece.pass'))}</small></span>
+      <span>
+        <span class="ad">${esc(L(p.obj.name))}</span><br>
+        <span class="yon">${passDir(p.startAz, p.endAz)}</span><br>
+        <span class="not">${esc(t('gece.passNote', { m: mins, mag: fmtMag(p.mag) }))}</span>
+      </span>
+      ${gauge(p.maxAlt)}
+    </a></li>`;
+}
+
 function kayit(i) {
-  const n = fists(i.alt);
-  const overhead = i.alt > OVERHEAD;
   const note = i.obj.body ? (i.sets ? t('gece.sets', { t: hhmm(i.sets) }) : cap(L(i.obj.alias))) : L(i.obj.note);
   // Şimdi görünür / hava kararınca görünür / gece içinde yükselir
   const tag = i.isNow ? `<small class="kirmizi">${upper(t('gece.now'))}</small>`
@@ -400,7 +437,7 @@ function kayit(i) {
         <span class="yon">${whereText(i.az, i.alt)}</span><br>
         <span class="not">${esc(note)}</span>
       </span>
-      <span class="ufuk" aria-hidden="true"><span class="cetvel"></span><span class="nokta" style="top:${overhead ? 0 : 45 - n * 5}px"></span><span class="ymr">${overhead ? upper(t('gece.top')) : upper(t(n === 1 ? 'gece.fist1' : 'gece.fistN', { n }))}</span></span>
+      ${gauge(i.alt)}
     </a></li>`;
 }
 
@@ -461,11 +498,14 @@ async function answer(node, [label, next]) {
 function sorResult() {
   const r = state.quiz.result;
   const [name, note] = r.none ? ['sor.none', 'sor.noneNote'] : r.kind === 'plane' ? ['sor.plane', 'sor.planeNote'] : ['sor.sat', 'sor.satNote'];
+  const live = r.kind === 'sat' && state.loc ? sats.visibleSats(skyNow(), state.loc, state.obs)[0] : null;
   $view.innerHTML = `
     <div class="cevap">
       <span class="t-etiket kirmizi">${upper(t(r.none ? 'sor.noMatch' : 'sor.result'))}</span>
       <h1 class="t-buyuk">${t(name)}</h1>
       <p class="t-not">${t(note)}</p>
+      ${live ? `<p class="t-veri kirmizi">${esc(t('sor.satLive', { n: L(live.obj.name), w: whereText(live.az, live.alt) }))}</p>
+      <a class="link" href="#cisim/${live.obj.id}">${t('bak.why')}</a>` : ''}
     </div>
     <div class="cevaplar" style="margin-top:32px"><button class="secenek" id="again"><span class="harf">↺</span><span class="metin">${t('sor.again')}</span><span class="ok">→</span></button></div>`;
   document.getElementById('again').onclick = resetQuiz;
@@ -479,13 +519,7 @@ async function viewCisim(id) {
   if (!o) { location.hash = 'bak'; return; }
   await ensureLocation();
   const now = skyNow();
-  const p = sky.position(o, now, state.obs);
-  const night = sky.tonight(now, state.obs, 99).items.find(i => i.obj === o);
-  const tonightText = night ? `${night.isNow && !clock.offset ? t('gece.now') : hhmm(night.time)}${night.sets ? ' – ' + hhmm(night.sets) : ''}` : t('cisim.notUp');
-  const where = p.alt > 0 ? whereText(p.az, p.alt) : night ? whereText(night.az, night.alt) : '—';
-  const dist = p.distKm == null ? null
-    : p.distKm < 1e6 ? `${Math.round(p.distKm).toLocaleString(locale())} km`
-    : t('cisim.km', { n: Math.round(p.distKm / 1e6).toLocaleString(locale()) });
+  const rows = o.sat ? satRows(o, now) : objRows(o, now);
   const from = state.quiz.result?.id === id ? 'sor' : 'bak';
   const otherLang = getLang() === 'tr' ? 'en' : 'tr';
   $view.innerHTML = `
@@ -499,15 +533,41 @@ async function viewCisim(id) {
       ${glyph(o, now)}
     </div>
     <div class="veriler">
-      <div><span class="t-etiket">${t('cisim.tonight')}</span><span>${tonightText}</span></div>
-      <div><span class="t-etiket">${t('cisim.where')}</span><span>${where}</span></div>
-      ${dist ? `<div><span class="t-etiket">${t('cisim.dist')}</span><span>${dist}</span></div>` : ''}
-      <div><span class="t-etiket">${t('cisim.mag')}</span><span>${fmtMag(p.mag)} ${t('cisim.magUnit')}</span></div>
+      ${rows.filter(([, v]) => v != null).map(([k, v]) => `<div><span class="t-etiket">${t(k)}</span><span>${v}</span></div>`).join('')}
     </div>
     <div class="uc-sey">
       ${o.facts ? `<h2 class="t-orta">${t('cisim.three')}</h2><ol>${L(o.facts).map(f => `<li>${esc(f)}</li>`).join('')}</ol>` : `<p class="t-not">${esc(L(o.note))}</p>`}
     </div>`;
   if (from === 'sor') state.quiz = { step: 'move', answers: [], hint: false, result: null };
+}
+
+// Ay, gezegen, yıldız: bu akşam ne zaman, nereye bak, uzaklık, parlaklık
+function objRows(o, now) {
+  const p = sky.position(o, now, state.obs);
+  const night = sky.tonight(now, state.obs, 99).items.find(i => i.obj === o);
+  const tonightText = night ? `${night.isNow && !clock.offset ? t('gece.now') : hhmm(night.time)}${night.sets ? ' – ' + hhmm(night.sets) : ''}` : t('cisim.notUp');
+  const where = p.alt > 0 ? whereText(p.az, p.alt) : night ? whereText(night.az, night.alt) : '—';
+  const dist = p.distKm == null ? null
+    : p.distKm < 1e6 ? `${Math.round(p.distKm).toLocaleString(locale())} km`
+    : t('cisim.km', { n: Math.round(p.distKm / 1e6).toLocaleString(locale()) });
+  return [['cisim.tonight', tonightText], ['cisim.where', where], ['cisim.dist', dist], ['cisim.mag', `${fmtMag(p.mag)} ${t('cisim.magUnit')}`]];
+}
+
+// Uzay istasyonu: şu an geçiyor mu, yoksa bu geceki ilk görünür geçiş
+function satRows(o, now) {
+  if (!sats.hasData(o)) return [['cisim.tonight', t('sat.noData')]];
+  const p = sats.satPosition(o, now, state.loc);
+  const live = sats.visibleSats(now, state.loc, state.obs).find(v => v.obj === o);
+  const win = sky.nightWindow(now, state.obs);
+  const next = !live && win && win.start < win.end ? sats.passes(o, win.start, win.end, state.loc, state.obs)[0] : null;
+  const tonightText = live ? t('gece.now') : next ? `${hhmm(next.start)} – ${hhmm(next.end)}` : t('sat.noPass');
+  const where = live ? whereText(live.az, live.alt) : next ? passDir(next.startAz, next.endAz) : '—';
+  const mag = live ? live.mag : next?.mag;
+  return [
+    ['cisim.tonight', tonightText], ['cisim.where', where],
+    ['sat.height', p ? `${Math.round(p.heightKm).toLocaleString(locale())} km` : null],
+    ['cisim.mag', mag != null ? `${fmtMag(mag)} ${t('cisim.magUnit')}` : null],
+  ];
 }
 
 // Ay/Venüs/Merkür için evre, diğer gezegenler için dolu disk, yıldızlar için ışın
@@ -523,6 +583,8 @@ function glyph(o, date) {
       <path d="M${c} ${c - r}A${r} ${r} 0 0 ${s1} ${c} ${c + r}A${rx} ${r} 0 0 ${s2} ${c} ${c - r}Z" fill="var(--murekkep-2)"/></svg>`;
   }
   if (o.body) return `<svg class="evre" viewBox="0 0 72 72" aria-hidden="true"><circle cx="${c}" cy="${c}" r="${r - 6}" fill="var(--murekkep-2)"/><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--murekkep-3)"/></svg>`;
+  if (o.sat) return `<svg class="evre" viewBox="0 0 72 72" aria-hidden="true"><path d="M20 36h32" stroke="var(--murekkep-3)"/><rect x="31" y="31" width="10" height="10" fill="var(--murekkep-2)"/><rect x="6" y="26" width="14" height="20" fill="none" stroke="var(--murekkep-2)"/><rect x="52" y="26" width="14" height="20" fill="none" stroke="var(--murekkep-2)"/><path d="M13 26v20M59 26v20" stroke="var(--murekkep-3)"/></svg>`;
+  if (o.type === 'galaksi' || o.type === 'bulutsu') return `<svg class="evre" viewBox="0 0 72 72" aria-hidden="true"><ellipse cx="${c}" cy="${c}" rx="${o.type === 'galaksi' ? 30 : 22}" ry="${o.type === 'galaksi' ? 10 : 16}" transform="rotate(-30 ${c} ${c})" fill="none" stroke="var(--murekkep-3)"/><ellipse cx="${c}" cy="${c}" rx="${o.type === 'galaksi' ? 12 : 9}" ry="${o.type === 'galaksi' ? 4 : 7}" transform="rotate(-30 ${c} ${c})" fill="var(--murekkep-2)"/></svg>`;
   return `<svg class="evre" viewBox="0 0 72 72" aria-hidden="true" stroke="var(--murekkep-2)"><path d="M36 14v44M14 36h44M22 22l28 28M50 22L22 50" stroke-width="1"/><circle cx="36" cy="36" r="4" fill="var(--murekkep)" stroke="none"/></svg>`;
 }
 
@@ -551,6 +613,8 @@ applyTheme(savedTheme() === 'gunduz' ? 'gunduz' : 'gece');
 clockFromUrl();
 ensureLocation().then(() => refreshSky(true));
 route();
+// İstasyonların yörünge verisi: gerekirse arka planda tazele, gelince açık ekranı yenile
+sats.refreshTLE().then(changed => { if (changed) { state.satsAt = 0; rerender(); } });
 
 // Geliştirirken (localhost) önbellek eski dosyaları göstermesin diye servis çalışanı kapalı
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});

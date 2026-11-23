@@ -2,12 +2,12 @@
 // Uygulama dosyaları: önce ağ (yeni sürüm hemen gelsin), ağ yoksa ya da yavaşsa önbellek.
 // Yazı tipleri gibi dış dosyalar: önce önbellek (değişmezler).
 // VERSION'ı sadece SHELL listesi değişince artırman yeterli; dosya içerikleri kendiliğinden tazelenir.
-const VERSION = 'gokbul-v4';
+const VERSION = 'gokbul-v5';
 const SHELL = [
   './', 'index.html', 'css/style.css', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
-  'js/app.js', 'js/i18n.js', 'js/objects.js', 'js/sky.js', 'js/sensors.js',
-  'vendor/astronomy.browser.min.js',
+  'js/app.js', 'js/i18n.js', 'js/objects.js', 'js/sky.js', 'js/sensors.js', 'js/satellites.js',
+  'vendor/astronomy.browser.min.js', 'vendor/satellite.min.js',
 ];
 const NETWORK_TIMEOUT = 3000; // sahada zayıf çekimde uzun beklemesin
 
@@ -44,6 +44,8 @@ function cacheFirst(req) {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // Yörünge verisi her zaman taze gelsin; uygulama onu zaten kendisi saklıyor
+  if (new URL(e.request.url).hostname === 'celestrak.org') return;
   const sameOrigin = new URL(e.request.url).origin === self.location.origin;
   e.respondWith(sameOrigin ? networkFirst(e.request) : cacheFirst(e.request));
 });

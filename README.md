@@ -57,11 +57,12 @@ css/style.css         Tasarım: renkler (Figma değişkenleriyle aynı), yazı t
 icons/                SVG ikon + ana ekran için PNG'ler (180 iOS, 192/512 Android)
 js/app.js             Ekranlar ve yönlendirme (#bak, #gece, #sor, #cisim/venus)
 js/sky.js             Gökyüzü hesapları (astronomy-engine kütüphanesi ile)
+js/satellites.js      ISS ve Tiangong: yörünge verisi (CelesTrak, 12 saatte bir), konum, görünür geçişler
 js/sensors.js         Konum (GPS ya da elle seçilen şehir) ve telefon yönü (pusula + jiroskop)
 js/objects.js         Gök cisimleri ve bilgileri (TR/EN)
 js/i18n.js            Arayüz metinleri (TR/EN)
 sw.js                 Çevrimdışı çalışma (dosya eklersen SHELL listesine ekle, VERSION'ı artır)
-vendor/               astronomy-engine 2.1.19 (CDN yerine projede; çevrimdışı ve güvenli)
+vendor/               astronomy-engine 2.1.19 ve satellite.js 5.0.0 (CDN yerine projede; çevrimdışı ve güvenli)
 tests/                Gökyüzü hesapları ve TR/EN metin testleri (npm test)
 ```
 
@@ -74,7 +75,8 @@ tests/                Gökyüzü hesapları ve TR/EN metin testleri (npm test)
 
 ## Sıradaki adımlar
 
-- [ ] Uluslararası Uzay İstasyonu geçişleri (CelesTrak yörünge verisi + satellite.js)
+- [x] Uluslararası Uzay İstasyonu ve Tiangong geçişleri (CelesTrak yörünge verisi + satellite.js)
+- [x] Andromeda Galaksisi ve Avcı Bulutsusu
 - [ ] Sınıf tahmin oyunu (öğretmen cisim seçer, öğrenciler tahmin eder)
 - [ ] Takımyıldız çizgileri (Büyük Ayı, Avcı, Kuğu…)
 - [ ] Telefonda gerçek gökyüzünde pusula doğruluğunu test etmek

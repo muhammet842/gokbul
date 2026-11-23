@@ -79,6 +79,49 @@ export const STARS = [
   star('regulus', 'Regulus', 'Regulus', 10.140, 11.967, 1.35, 'Aslan’ın kalbi.', 'The heart of Leo.'),
   star('polaris', 'Kutup Yıldızı', 'Polaris', 2.530, 89.264, 1.98, 'Hep kuzeyde, aynı yerde durur. Yön bulmak için kullanılır.', 'It always sits in the north. Used for finding direction.'),
   star('pleiades', 'Ülker', 'Pleiades', 3.791, 24.105, 1.6, 'Bulanık küçük bir yıldız kümesi. Kaç yıldız sayabilirsin?', 'A small hazy star cluster. How many stars can you count?', 'kume'),
+  {
+    ...star('andromeda', 'Andromeda Galaksisi', 'Andromeda Galaxy', 0.712, 41.269, 3.4,
+      'Karanlık bir yerde soluk, uzunca bir bulut gibi görünür. Gördüğün ışık 2,5 milyon yıl önce yola çıktı.',
+      'From a dark site it looks like a faint, elongated smudge. Its light left 2.5 million years ago.', 'galaksi'),
+    alias: { tr: 'M31', en: 'M31' },
+    facts: {
+      tr: ['Çıplak gözle görülebilen en uzak cisimlerden biridir: yaklaşık 2,5 milyon ışık yılı.', 'Yaklaşık bir trilyon yıldız barındırır.', 'Şehir ışıklarından uzakta, Ay yokken bakmak gerekir.'],
+      en: ['One of the most distant things visible to the naked eye: about 2.5 million light-years.', 'It holds roughly a trillion stars.', 'You need a dark site away from city lights, with no Moon.'],
+    },
+  },
+  {
+    ...star('orion-nebula', 'Avcı Bulutsusu', 'Orion Nebula', 5.588, -5.391, 4.0,
+      'Avcı’nın kılıcındaki bulanık leke. Yeni yıldızların doğduğu dev bir gaz bulutu.',
+      'The fuzzy patch in Orion’s sword: a vast cloud of gas where new stars are born.', 'bulutsu'),
+    alias: { tr: 'M42', en: 'M42' },
+    facts: {
+      tr: ['Yaklaşık 1.300 ışık yılı uzaklıktadır.', 'İçinde şu anda yeni yıldızlar oluşuyor.', 'Dürbünle bakınca bulut daha belirgin görünür.'],
+      en: ['It is about 1,300 light-years away.', 'New stars are forming inside it right now.', 'Binoculars show the cloud much more clearly.'],
+    },
+  },
+];
+
+// Uzay istasyonları: yerleri yıldızlar gibi sabit değil, satellites.js yörünge verisinden hesaplar.
+// stdMag: 1000 km uzaklıktaki yaklaşık parlaklık. norad: CelesTrak katalog numarası.
+export const SATS = [
+  {
+    id: 'iss', sat: true, norad: 25544, stdMag: -1.8, type: 'istasyon',
+    name: { tr: 'Uluslararası Uzay İstasyonu', en: 'International Space Station' }, alias: { tr: 'ISS', en: 'ISS' },
+    note: { tr: 'Yanıp sönmeden, birkaç dakikada gökyüzünü boydan boya geçen çok parlak bir ışık.', en: 'A very bright, steady light that crosses the whole sky in a few minutes.' },
+    facts: {
+      tr: ['Saatte yaklaşık 28.000 km hızla gider; Dünya’nın çevresini yaklaşık 90 dakikada dolanır.', '2000 yılından beri içinde kesintisiz insan yaşıyor.', 'Kendi ışığı yoktur; gördüğün parlaklık güneş panellerinden yansıyan Güneş ışığıdır.'],
+      en: ['It travels at about 28,000 km/h, circling Earth roughly every 90 minutes.', 'People have lived aboard without a break since 2000.', 'It has no light of its own; you see sunlight reflecting off its solar panels.'],
+    },
+  },
+  {
+    id: 'tiangong', sat: true, norad: 48274, stdMag: -0.5, type: 'istasyon',
+    name: { tr: 'Tiangong', en: 'Tiangong' }, alias: { tr: 'Çin Uzay İstasyonu', en: 'China Space Station' },
+    note: { tr: 'Çin’in uzay istasyonu. ISS’ten küçük ve biraz sönüktür ama çıplak gözle rahatça görülür.', en: 'China’s space station. Smaller and a little fainter than the ISS, but easy to see by eye.' },
+    facts: {
+      tr: ['Adı “Gök Sarayı” anlamına gelir.', 'Yaklaşık 390 km yükseklikte dolanır.', 'Üç modülü 2021–2022 arasında uzayda birleştirildi.'],
+      en: ['Its name means “Heavenly Palace”.', 'It orbits about 390 km above the ground.', 'Its three modules were joined in space in 2021–2022.'],
+    },
+  },
 ];
 
 export const TYPE_LABEL = {
@@ -86,7 +129,10 @@ export const TYPE_LABEL = {
   gezegen: { tr: 'Gezegen', en: 'Planet' },
   yildiz: { tr: 'Yıldız', en: 'Star' },
   kume: { tr: 'Yıldız kümesi', en: 'Star cluster' },
+  galaksi: { tr: 'Galaksi', en: 'Galaxy' },
+  bulutsu: { tr: 'Bulutsu', en: 'Nebula' },
+  istasyon: { tr: 'Uzay istasyonu', en: 'Space station' },
 };
 
 export const ALL = [...BODIES, ...STARS];
-export const byId = id => ALL.find(o => o.id === id);
+export const byId = id => ALL.find(o => o.id === id) ?? SATS.find(o => o.id === id);
